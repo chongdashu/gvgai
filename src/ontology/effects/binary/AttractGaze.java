@@ -3,8 +3,10 @@ package ontology.effects.binary;
 import core.VGDLSprite;
 import core.content.InteractionContent;
 import core.game.Game;
+import ontology.Types;
 import ontology.effects.Effect;
-import tools.Vector2d;
+
+import java.awt.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -15,15 +17,12 @@ import tools.Vector2d;
  */
 public class AttractGaze extends Effect
 {
-    public double prob;
+    public boolean align = false;
 
     public AttractGaze(InteractionContent cnt)
     {
-        prob = 1;
         this.parseParameters(cnt);
-
-        if(prob > 0 && prob < 1)
-            is_stochastic = true;
+        setStochastic();
     }
 
     @Override
@@ -31,8 +30,26 @@ public class AttractGaze extends Effect
     {
         if(sprite1.is_oriented && sprite2.is_oriented)
         {
-            if(game.getRandomGenerator().nextDouble() < prob)
+            if(game.getRandomGenerator().nextDouble() < prob) {
                 sprite1.orientation = sprite2.orientation.copy();
+
+                if(align)
+                {
+                    if(sprite1.orientation.equals(Types.LEFT) || sprite1.orientation.equals(Types.RIGHT))
+                    {
+                        //Need to align on the Y coordinate.
+                        sprite1.rect = new Rectangle(sprite1.rect.x, sprite2.rect.y,
+                                sprite1.rect.width, sprite1.rect.height);
+
+                    }else{
+                        //Need to align on the X coordinate.
+                        sprite1.rect = new Rectangle(sprite2.rect.x, sprite1.rect.y,
+                                sprite1.rect.width, sprite1.rect.height);
+                    }
+                }
+
+
+            }
         }
     }
 }

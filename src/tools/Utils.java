@@ -1,15 +1,11 @@
 package tools;
 
-import core.VGDLSprite;
-import core.game.Game;
-import ontology.Types;
-import ontology.physics.Physics;
-
-import java.awt.*;
-import java.lang.reflect.Field;
+import java.awt.Polygon;
+import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Random;
-import java.util.TreeMap;
+
+import ontology.Types;
 
 /**
  * Created with IntelliJ IDEA.
@@ -107,7 +103,29 @@ public class Utils
     //Normalizes a value between its MIN and MAX.
     public static double normalise(double a_value, double a_min, double a_max)
     {
-        return (a_value - a_min)/(a_max - a_min);
+        if(a_min < a_max)
+            return (a_value - a_min)/(a_max - a_min);
+        else    // if bounds are invalid, then return same value
+            return a_value;
+    }
+
+
+
+    /**
+     * Adds a small noise to the input value.
+     * @param input value to be altered
+     * @param epsilon relative amount the input will be altered
+     * @param random random variable in range [0,1]
+     * @return epsilon-random-altered input value
+     */
+    public static double noise(double input, double epsilon, double random)
+    {
+        if(input != -epsilon) {
+            return (input + epsilon) * (1.0 + epsilon * (random - 0.5));
+        }else {
+            //System.out.format("Utils.tiebreaker(): WARNING: value equal to epsilon: %f\n",input);
+            return (input + epsilon) * (1.0 + epsilon * (random - 0.5));
+        }
     }
 
     public static boolean processUseKey(boolean[] key_pressed)
@@ -128,5 +146,4 @@ public class Utils
         }
         return maxIndex;
     }
-
 }

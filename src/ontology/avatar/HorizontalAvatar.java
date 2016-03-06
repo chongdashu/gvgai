@@ -1,12 +1,12 @@
 package ontology.avatar;
 
+import java.awt.Dimension;
+
 import core.VGDLSprite;
 import core.content.SpriteContent;
 import core.game.Game;
 import ontology.Types;
 import tools.Vector2d;
-
-import java.awt.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -48,10 +48,26 @@ public class HorizontalAvatar extends MovingAvatar
         super.loadDefaults();
     }
 
+
+    /**
+     * This update call is for the game tick() loop.
+     * @param game current state of the game.
+     */
     public void update(Game game)
     {
         super.update(game);
     }
+
+    /**
+     * This move call is for the Forward Model tick() loop.
+     * @param game current state of the game.
+     * @param actionMask action to apply.
+     */
+    public void move(Game game, boolean[] actionMask)
+    {
+        super.move(game, actionMask);
+    }
+
 
     public VGDLSprite copy()
     {

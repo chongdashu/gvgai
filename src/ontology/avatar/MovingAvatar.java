@@ -1,18 +1,17 @@
 package ontology.avatar;
 
+import java.awt.Dimension;
+import java.util.ArrayList;
+
 import core.VGDLSprite;
 import core.competition.CompetitionParameters;
 import core.content.SpriteContent;
 import core.game.Game;
+import core.player.AbstractPlayer;
 import ontology.Types;
 import tools.ElapsedCpuTimer;
 import tools.Utils;
 import tools.Vector2d;
-
-import java.awt.*;
-import java.util.ArrayList;
-
-import core.player.AbstractPlayer;
 
 /**
  * Created with IntelliJ IDEA.
@@ -25,9 +24,13 @@ public class MovingAvatar extends VGDLSprite {
 
     public boolean alternate_keys;
     public ArrayList<Types.ACTIONS> actions;
+    public ArrayList<Types.ACTIONS> actionsNIL;
     public AbstractPlayer player;
 
-    public boolean hasMoved = false;
+    //This is the last action executed in the game.
+    public Types.ACTIONS lastAction;
+
+    public Types.MOVEMENT lastMovementType = Types.MOVEMENT.STILL;
 
     public MovingAvatar() {
     }
@@ -49,6 +52,8 @@ public class MovingAvatar extends VGDLSprite {
     protected void loadDefaults() {
         super.loadDefaults();
         actions = new ArrayList<Types.ACTIONS>();
+        actionsNIL = new ArrayList<Types.ACTIONS>();
+        lastAction = Types.ACTIONS.ACTION_NIL;
 
         color = Types.WHITE;
         speed = 1;
@@ -69,17 +74,64 @@ public class MovingAvatar extends VGDLSprite {
 
         super.postProcess();
 
+        //A separate array with the same actions, plus NIL.
+        for(Types.ACTIONS act : actions)
+        {
+            actionsNIL.add(act);
+        }
+        actionsNIL.add(Types.ACTIONS.ACTION_NIL);
     }
 
+    /**
+     * This update call is for the game tick() loop.
+     * @param game current state of the game.
+     */
     public void update(Game game) {
-        super.updatePassive();
 
-        hasMoved = false;
+        lastMovementType = Types.MOVEMENT.STILL;
 
-        ElapsedCpuTimer ect = new ElapsedCpuTimer(ElapsedCpuTimer.TimerType.CPU_TIME);
+        //Sets the input mask for this cycle.
+        game.ki.setMask();
+
+        //Get the input from the player.
+        requestPlayerInput(game);
+
+        //Map from the action mask to a Vector2D action.
+        Vector2d action2D = Utils.processMovementActionKeys(game.ki.getMask());
+
+        //Apply the physical movement.
+        applyMovement(game, action2D);
+    }
+
+
+    /**
+     * This move call is for the Forward Model tick() loop.
+     * @param game current state of the game.
+     * @param actionMask action to apply.
+     */
+    public void move(Game game, boolean[] actionMask) {
+
+        //Apply action supplied (active movement). USE is checked up in the hierarchy.
+        Vector2d action = Utils.processMovementActionKeys(actionMask);
+        applyMovement(game, action);
+    }
+
+    private void applyMovement(Game game, Vector2d action)
+    {
+        lastMovementType = this.physics.activeMovement(this, action, this.speed);
+        game.setAvatarLastAction(Types.ACTIONS.fromVector(action));
+    }
+
+    /**
+     * Requests the controller's input, setting the game.ki.action mask with the processed data.
+     * @param game
+     */
+    protected void requestPlayerInput(Game game)
+    {
+        ElapsedCpuTimer ect = new ElapsedCpuTimer(CompetitionParameters.TIMER_TYPE);
         ect.setMaxTimeMillis(CompetitionParameters.ACTION_TIME);
 
-        Types.ACTIONS action = this.player.act(game.getObservation(), ect);
+        Types.ACTIONS action = this.player.act(game.getObservation(), ect.copy());
 
         if(ect.exceededMaxTime())
         {
@@ -97,30 +149,22 @@ public class MovingAvatar extends VGDLSprite {
             action = Types.ACTIONS.ACTION_NIL;
         }
 
+
         if(!actions.contains(action))
             action = Types.ACTIONS.ACTION_NIL;
 
         this.player.logAction(action);
+        lastAction = action;
         game.ki.reset();
         game.ki.setAction(action);
-
-        Vector2d action2D = Utils.processMovementActionKeys(game.ki.getMask());
-
-        if(action2D != Types.NONE)
-            hasMoved = true;
-
-        this.physics.activeMovement(this, action2D, this.speed);
     }
 
-    /**
-     * Performs a given movement, with an action
-     * @param actionMask action mask to perform.
-     */
-    public void performActiveMovement(boolean[] actionMask)
+
+    public void updateUse(Game game)
     {
-        Vector2d action = Utils.processMovementActionKeys(actionMask);
-        this.physics.activeMovement(this, action, this.speed);
+        //Nothing to do by default.
     }
+
 
     public VGDLSprite copy() {
         MovingAvatar newSprite = new MovingAvatar();
@@ -132,6 +176,8 @@ public class MovingAvatar extends VGDLSprite {
         MovingAvatar targetSprite = (MovingAvatar) target;
         targetSprite.alternate_keys = this.alternate_keys;
         targetSprite.actions = new ArrayList<Types.ACTIONS>();
+        targetSprite.actionsNIL = new ArrayList<Types.ACTIONS>();
+        targetSprite.lastAction = this.lastAction;
         targetSprite.postProcess();
         super.copyTo(targetSprite);
     }

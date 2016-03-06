@@ -1,5 +1,8 @@
 package ontology.effects.binary;
 
+import java.awt.Rectangle;
+import java.util.ArrayList;
+
 import core.VGDLSprite;
 import core.content.InteractionContent;
 import core.game.Game;
@@ -8,9 +11,6 @@ import ontology.effects.Effect;
 import ontology.physics.ContinuousPhysics;
 import ontology.physics.GridPhysics;
 import tools.Vector2d;
-
-import java.awt.*;
-import java.util.ArrayList;
 
 /**
  * Created with IntelliJ IDEA.
@@ -25,8 +25,11 @@ public class PullWithIt extends Effect
 
     private ArrayList<VGDLSprite> spritesThisCycle;
 
+    public boolean pixelPerfect;
+
     public PullWithIt(InteractionContent cnt)
     {
+        pixelPerfect = false;
         lastGameTime = -1;
         spritesThisCycle = new ArrayList<VGDLSprite>();
         this.parseParameters(cnt);
@@ -73,5 +76,10 @@ public class PullWithIt extends Effect
         }
 
         sprite1.lastrect = new Rectangle(r);
+
+        if(pixelPerfect)
+        {
+            sprite1.setRect(sprite2.rect);
+        }
     }
 }

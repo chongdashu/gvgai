@@ -1,14 +1,24 @@
 package core.game;
 
+import java.awt.Dimension;
+import java.sql.Time;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+
 import core.SpriteGroup;
 import core.VGDLSprite;
 import ontology.Types;
 import ontology.avatar.MovingAvatar;
-import tools.ElapsedCpuTimer;
+import ontology.effects.TimeEffect;
+import tools.Pair;
 import tools.Vector2d;
-
-import java.awt.*;
-import java.util.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -103,6 +113,7 @@ public class ForwardModel extends Game
         kill_list = new ArrayList<VGDLSprite>();
         bucketList = new Bucket[numSpriteTypes];
         historicEvents = new TreeSet<Event>();
+        shieldedEffects = new ArrayList[numSpriteTypes];
 
         //Copy of sprites from the game.
         spriteGroups = new SpriteGroup[numSpriteTypes];
@@ -119,12 +130,20 @@ public class ForwardModel extends Game
                 VGDLSprite sp = spriteIt.next();
                 VGDLSprite spCopy = sp.copy();
                 spriteGroups[i].addSprite(spCopy.spriteID, spCopy);
-                checkSpriteFeatures(spCopy, i);
-                updateObservation(spCopy);
+
+                if(!spCopy.hidden) {
+                    checkSpriteFeatures(spCopy, i);
+                    updateObservation(spCopy);
+                }
             }
 
             int nSprites = spriteGroups[i].numSprites();
             num_sprites += nSprites;
+
+            //copy the shields
+            shieldedEffects[i] = new ArrayList<>();
+            for(Pair p : a_gameState.shieldedEffects[i])
+                shieldedEffects[i].add(p.copy());
         }
 
         //events:
@@ -134,11 +153,22 @@ public class ForwardModel extends Game
             historicEvents.add(itEvent.next().copy());
         }
 
+        //copy the time effects:
+        this.timeEffects = new TreeSet<TimeEffect>();
+        Iterator<TimeEffect> timeEffects = a_gameState.timeEffects.descendingIterator();
+        while(timeEffects.hasNext())
+        {
+            TimeEffect tef = timeEffects.next().copy();
+            this.timeEffects.add(tef);
+        }
+        //System.out.println("Tef size: " + this.timeEffects.size());
+
         //Game state variables:
         this.gameTick = a_gameState.gameTick;
         this.isEnded = a_gameState.isEnded;
         this.winner = a_gameState.winner;
         this.score = a_gameState.score;
+        this.avatarLastAction = a_gameState.avatarLastAction;
         this.nextSpriteID = a_gameState.nextSpriteID;
     }
 
@@ -379,6 +409,8 @@ public class ForwardModel extends Game
         this.gameTick = 0;
         this.isEnded = false;
         this.winner = Types.WINNER.NO_WINNER;
+
+
     }
 
     /**
@@ -406,6 +438,7 @@ public class ForwardModel extends Game
         this.score = a_gameState.score;
         this.frame_rate = a_gameState.frame_rate; //is this needed?
         this.MAX_SPRITES = a_gameState.MAX_SPRITES;
+        this.avatarLastAction = a_gameState.avatarLastAction;
 
         //create the boolean maps of sprite types.
         npcList = new boolean[a_gameState.spriteGroups.length];
@@ -421,6 +454,8 @@ public class ForwardModel extends Game
         for(int i = 0; i < observationGrid.length; ++i)
             for(int j = 0; j < observationGrid[i].length; ++j)
                 observationGrid[i][j] = new ArrayList<Observation>();
+
+        this.pathf = a_gameState.pathf;
     }
 
 
@@ -434,25 +469,33 @@ public class ForwardModel extends Game
         return randomObs;
     }
 
+    /**
+     * Sets a new seed for the forward model's random generator (creates a new object)
+     *
+     * @param seed the new seed.
+     */
+    public void setNewSeed(int seed)
+    {
+        randomObs = new Random(seed);
+    }
+
+
     /************** Useful functions for the agent *******************/
 
     /**
      * Performs one tick for the game: calling update(this) in all sprites. It follows the
-     * opposite order of the drawing order (spriteOrder[]). It uses the action received as the
-     * action of the avatar.
+     * same order of update calls as in the real game (inverse spriteOrder[]). Avatar moves
+     * the first one. It uses the action received as the action of the avatar.
      * @param action Action to be performed by the avatar for this game tick.
      */
     protected void tick(Types.ACTIONS action)
     {
-        //Avatar first.
         this.ki.reset();
         this.ki.setAction(action);
-        if(avatar != null)
-            avatar.performActiveMovement(this.ki.getMask());
+        avatar.preMovement();
+        avatar.move(this, this.ki.getMask());
 
-        //Now, update all others (but avatar).
-        int typeIndex = spriteOrder.length-1;
-        for(int i = typeIndex; i >=0; --i)   //For update, opposite order than drawing.
+        for(int i = spriteOrder.length-1; i >= 0; --i)
         {
             int spriteTypeInt = spriteOrder[i];
 
@@ -460,8 +503,12 @@ public class ForwardModel extends Game
             if(spriteIt != null) while(spriteIt.hasNext())
             {
                 VGDLSprite sp = spriteIt.next();
+
                 if(sp != avatar)
+                {
+                    sp.preMovement();
                     sp.update(this);
+                }
             }
         }
 
@@ -477,11 +524,12 @@ public class ForwardModel extends Game
         if(!isEnded)
         {
             tick(action);
-            gameTick++;
             eventHandling();
-            clearAll();
+            clearAll(this);
             terminationHandling();
+            checkTimeOut();
             updateAllObservations();
+            gameTick++;
         }
     }
 
@@ -551,14 +599,6 @@ public class ForwardModel extends Game
         return screenSize;
     }
 
-    /**
-     * Indicates how many pixels form a block in the game.
-     * @return how many pixels form a block in the game.
-     */
-    public int getBlockSize()
-    {
-        return block_size;
-    }
 
     /** avatar-dependent functions **/
 
@@ -603,13 +643,17 @@ public class ForwardModel extends Game
 
     /**
      * Returns the actions that are available in this game for
-     * the avatar.
-     * @return the available actions. An empty list if the game is ended.
+     * the avatar. If the parameter 'includeNIL' is true, the array contains the (always available)
+     * NIL action. If it is false, this is equivalent to calling getAvailableActions().
+     * @param includeNIL true to include Types.ACTIONS.ACTION_NIL in the array of actions.
+     * @return the available actions.
      */
-    public ArrayList<Types.ACTIONS> getAvatarActions()
+    public ArrayList<Types.ACTIONS> getAvatarActions(boolean includeNIL)
     {
         if(isEnded)
             return new ArrayList<Types.ACTIONS>();
+        if(includeNIL)
+            return avatar.actionsNIL;
         return avatar.actions;
     }
 
@@ -640,6 +684,50 @@ public class ForwardModel extends Game
 
         return owned;
     }
+
+    /**
+     * Returns the avatar's last move. At the first game cycle, it returns ACTION_NIL.
+     * Note that this may NOT be the same as the last action given by the agent, as it may
+     * have overspent in the last game cycle.
+     * @return the action that was executed in the real game in the last cycle. ACTION_NIL
+     * is returned in the very first game step.
+     */
+    public Types.ACTIONS getAvatarLastAction()
+    {
+        if(avatarLastAction != null)
+            return avatarLastAction;
+        else return Types.ACTIONS.ACTION_NIL;
+    }
+
+
+    /**
+     * Returns the avatar's type. In case it has multiple types, it returns the most specific one.
+     * @return the itype of the avatar.
+     */
+    public int getAvatarType()
+    {
+        return avatar.getType();
+    }
+
+
+    /**
+     * Returns the health points of the avatar. A value of 0 doesn't necessarily
+     * mean that the avatar is dead (could be that no health points are in use in that game).
+     * @return a numeric value, the amount of remaining health points.
+     */
+    public int getAvatarHealthPoints() { return avatar.healthPoints; }
+
+    /**
+     * Returns the maximum amount of health points.
+     * @return the maximum amount of health points the avatar can have.
+     */
+    public int getAvatarMaxHealthPoints() { return avatar.maxHealthPoints; }
+
+    /**
+     * Returns the limit of health points this avatar can have.
+     * @return the limit of health points the avatar can have.
+     */
+    public int getAvatarLimitHealthPoints() {return avatar.limitHealthPoints;}
 
 
     /** Methods that return positions of things **/
@@ -680,6 +768,13 @@ public class ForwardModel extends Game
                 if(spriteIt != null) while(spriteIt.hasNext())
                 {
                     VGDLSprite sp = spriteIt.next();
+
+                    if(sp.hidden)
+                    {
+                        observations[idx] = null;
+                        break;
+                    }
+
                     Observation observation = getSpriteObservation(sp);
                     observation.update(i, sp.spriteID, sp.getPosition(), reference, getSpriteCategory(sp));
 
@@ -781,11 +876,46 @@ public class ForwardModel extends Game
         return getPositionsFrom(fromAvatar, refPosition);
     }
 
+    /**
+     * Checks if the observations of both models are the same.
+     * DEBUG ONLY METHOD.
+     * @param other the forward model to compare to.
+     * @return true if everything is the same.
+     */
+    public boolean equalObservations(ForwardModel other)
+    {
+        for(int i = 0; i < spriteGroups.length; ++i)
+        {
+            ConcurrentHashMap<Integer, VGDLSprite> thisSpriteMap = this.spriteGroups[i].getSprites();
+            ConcurrentHashMap<Integer, VGDLSprite> otherSpriteMap = other.spriteGroups[i].getSprites();
+            if(thisSpriteMap.size() != otherSpriteMap.size())
+            {
+                if(thisSpriteMap.size() > 25 && otherSpriteMap.size() > 25)
+                {
+                    //For reasons I don't fully understand (balancing?), ConcurrentHashMap returns the keySet
+                    // in different order some times when there are many elements. This makes the update happen
+                    // in a different order and therefore (in stochastic environments) things change. If this
+                    // happens, we ignore this case (this scenario has only been seen in Firestorms so far).
+                    return true;
+                }
+                return false;
+            }
+
+            Set<Integer> allOtherSpriteKeys = otherSpriteMap.keySet();
+            for(Integer key : allOtherSpriteKeys)
+            {
+                VGDLSprite sp = thisSpriteMap.get(key);
+                if(!otherSpriteMap.get(key).equiv(sp))
+                    return false;
+            }
+        }
+        return true;
+    }
 
     //Must override this:
-    @Override
-    public void buildLevel(String gamelvl) {
-        throw new RuntimeException("buildLevel should not be called in this instance.");
-    }
+	@Override
+	public void buildStringLevel(String[] levelString) {
+		throw new RuntimeException("buildLevel should not be called in this instance.");
+	}
 
 }

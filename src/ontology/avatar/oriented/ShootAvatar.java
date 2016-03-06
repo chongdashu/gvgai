@@ -1,5 +1,8 @@
 package ontology.avatar.oriented;
 
+import java.awt.Dimension;
+import java.util.ArrayList;
+
 import core.VGDLRegistry;
 import core.VGDLSprite;
 import core.content.SpriteContent;
@@ -7,8 +10,6 @@ import core.game.Game;
 import ontology.Types;
 import tools.Utils;
 import tools.Vector2d;
-
-import java.awt.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -52,15 +53,35 @@ public class ShootAvatar extends OrientedAvatar
         itype = -1;
     }
 
+    /**
+     * This update call is for the game tick() loop.
+     * @param game current state of the game.
+     */
     public void update(Game game)
     {
         super.update(game);
+        if(lastMovementType == Types.MOVEMENT.STILL)
+            updateUse(game);
+    }
 
-        if(!hasMoved && Utils.processUseKey(game.ki.getMask()) && hasAmmo())
+
+    /**
+     * This move call is for the Forward Model tick() loop.
+     * @param game current state of the game.
+     * @param actionMask action to apply.
+     */
+    public void move(Game game, boolean[] actionMask)
+    {
+        super.move(game, actionMask);
+        updateUse(game);
+    }
+
+    public void updateUse(Game game)
+    {
+        if(Utils.processUseKey(game.ki.getMask()) && hasAmmo())
         {
             shoot(game);
         }
-
     }
 
     private void shoot(Game game)
@@ -136,5 +157,14 @@ public class ShootAvatar extends OrientedAvatar
         targetSprite.ammoId= this.ammoId;
 
         super.copyTo(targetSprite);
+    }
+    
+    @Override
+    public ArrayList<String> getDependentSprites(){
+    	ArrayList<String> result = new ArrayList<String>();
+    	if(ammo != null) result.add(ammo);
+    	if(stype != null) result.add(stype);
+    	
+    	return result;
     }
 }

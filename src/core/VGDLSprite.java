@@ -1,18 +1,32 @@
 package core;
 
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Graphics2D;
+import java.awt.Image;
+import java.awt.Polygon;
+import java.awt.Rectangle;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.TreeMap;
+
+import javax.imageio.ImageIO;
+
 import core.competition.CompetitionParameters;
 import core.content.SpriteContent;
 import core.game.Game;
 import ontology.Types;
-import ontology.physics.*;
+import ontology.physics.ContinuousPhysics;
+import ontology.physics.GravityPhysics;
+import ontology.physics.GridPhysics;
+import ontology.physics.NoFrictionPhysics;
+import ontology.physics.Physics;
 import tools.Utils;
 import tools.Vector2d;
-
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.io.File;
-import java.io.IOException;
-import java.util.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -145,6 +159,11 @@ public abstract class VGDLSprite {
     public boolean invisible;
 
     /**
+     * If true, this sprite is never present in the observations passed to the controller.
+     */
+    public boolean hidden;
+
+    /**
      * List of types this sprite belongs to. It contains the ids, including itself's, from this sprite up
      * in the hierarchy of sprites defined in SpriteSet in the game definition.
      */
@@ -191,6 +210,39 @@ public abstract class VGDLSprite {
     public boolean bucketSharp;
 
     /**
+     * Indicates if the sprite is able to rotate in place.
+     */
+    public boolean rotateInPlace;
+
+    /**
+     * Indicates if the sprite is in its first cycle of existence.
+     * Passive movement is not allowed in the first tick.
+     */
+    public boolean isFirstTick;
+
+    /**
+     * Health points of this sprite. It does not automatically kill the sprite
+     * when it gets to 0 (an effect must do that, like 'SubtractHealthPoints').
+     * Its default value is set to 0, if not set specifically in VGDL.
+     */
+    public int healthPoints;
+
+
+    /**
+     * Maximum health points of this sprite.
+     * If not set specifically in VGDL, the default value is set to the healthPoints value set.
+     * This is NOT the maximum possible amount of points, it's the max. ever had.
+     */
+    public int maxHealthPoints;
+
+
+    /**
+     * Limit of health points of this can have.
+     * If not set specifically in VGDL, the default value is set to a very high value (1000)
+     */
+    public int limitHealthPoints;
+
+    /**
      * Initializes the sprite, giving its position and dimensions.
      * @param position position of the sprite
      * @param size dimensions of the sprite on the screen.
@@ -217,6 +269,9 @@ public abstract class VGDLSprite {
         orientation = Types.NONE;
         lastmove = 0;
         invisible = false;
+        rotateInPlace = false;
+        isFirstTick = true;
+        limitHealthPoints = 1000;
         resources = new TreeMap<Integer, Integer>();
         itypes = new ArrayList<Integer>();
 
@@ -305,26 +360,50 @@ public abstract class VGDLSprite {
     }
 
     /**
+     * Prepares the sprite for movement.
+     */
+    public void preMovement()
+    {
+        lastrect = new Rectangle(rect);
+        lastmove += 1;
+    }
+
+    /**
      * Updates this sprite applying the passive movement.
      */
     public void updatePassive() {
-
-        lastrect = new Rectangle(rect);
-        lastmove += 1;
 
         if (!is_static && !only_active) {
             physics.passiveMovement(this);
         }
     }
 
+
+    /**
+     * Updates the orientation of the avatar to match the orientation parameter.
+     * @param orientation final orientation the avatar must have.
+     * @return true if orientation could be changed. This returns false in two circumstances:
+     * the avatar is not oriented (is_oriented == false) or the previous orientation is the
+     * same as the one received by parameter.
+     */
+    public boolean _updateOrientation(Vector2d orientation)
+    {
+        if(!this.is_oriented) return false;
+        if(this.orientation.equals(orientation)) return false;
+        this.orientation = orientation.copy();
+        return true;
+    }
+
     /**
      * Updates the position of the sprite, giving its orientation and speed.
      * @param orientation the orientation of the sprite.
      * @param speed the speed of the sprite.
+     * @return true if the position changed.
      */
-    public void _updatePos(Vector2d orientation, int speed) {
+    public boolean _updatePos(Vector2d orientation, int speed) {
         if (speed == 0) {
             speed = (int) this.speed;
+            if(speed == 0) return false;
         }
 
         if (cooldown <= lastmove && (Math.abs(orientation.x) + Math.abs(orientation.y) != 0)) {
@@ -332,7 +411,9 @@ public abstract class VGDLSprite {
             bucket = rect.y / rect.height;
             bucketSharp = (rect.y % rect.height) == 0;
             lastmove = 0;
+            return true;
         }
+        return false;
     }
 
     /**
@@ -400,18 +481,25 @@ public abstract class VGDLSprite {
 
         if(!invisible)
         {
+            Rectangle r = new Rectangle(rect);
+
             if(image != null)
-                _drawImage(gphx, game);
+                _drawImage(gphx, game, r);
             else
-                _draw(gphx, game);
+                _draw(gphx, game, r);
 
             if(resources.size() > 0)
             {
-                _drawResources(gphx, game);
+                _drawResources(gphx, game, r);
+            }
+
+            if(healthPoints > 0)
+            {
+                _drawHealthBar(gphx, game, r);
             }
 
             if (is_oriented)
-                _drawOriented(gphx);
+                _drawOriented(gphx, r);
         }
     }
 
@@ -419,12 +507,12 @@ public abstract class VGDLSprite {
      * In case this sprite is oriented and has an arrow to draw, it draws it.
      * @param g graphics device to draw in.
      */
-    public void _drawOriented(Graphics2D g)
+    public void _drawOriented(Graphics2D g, Rectangle r)
     {
         if(draw_arrow)
         {
             Color arrowColor = new Color(color.getRed(), 255-color.getGreen(), color.getBlue());
-            Polygon p = Utils.triPoints(rect, orientation);
+            Polygon p = Utils.triPoints(r, orientation);
 
             g.setColor(arrowColor);
             //g.drawPolygon(p);
@@ -437,9 +525,9 @@ public abstract class VGDLSprite {
      * @param gphx graphics object to draw in.
      * @param game reference to the game that is being played now.
      */
-    public void _draw(Graphics2D gphx, Game game)
+    public void _draw(Graphics2D gphx, Game game, Rectangle r)
     {
-        Rectangle r = new Rectangle(rect);
+
         if(shrinkfactor != 1)
         {
             r.width *= shrinkfactor;
@@ -460,6 +548,7 @@ public abstract class VGDLSprite {
         {
             gphx.fillRect(r.x, r.y, r.width, r.height);
         }
+
     }
 
     /**
@@ -467,9 +556,8 @@ public abstract class VGDLSprite {
      * @param gphx graphics object to draw in.
      * @param game reference to the game that is being played now.
      */
-    public void _drawImage(Graphics2D gphx, Game game)
+    public void _drawImage(Graphics2D gphx, Game game, Rectangle r)
     {
-        Rectangle r = new Rectangle(rect);
         if(shrinkfactor != 1)
         {
             r.width *= shrinkfactor;
@@ -497,11 +585,11 @@ public abstract class VGDLSprite {
      * @param gphx graphics to draw in.
      * @param game game being played at the moment.
      */
-    protected void _drawResources(Graphics2D gphx, Game game)
+    protected void _drawResources(Graphics2D gphx, Game game, Rectangle r)
     {
         int numResources = resources.size();
-        double barheight = rect.getHeight() / 3.5f / numResources;
-        double offset = rect.getMinY() + 2*rect.height / 3.0f;
+        double barheight = r.getHeight() / 3.5f / numResources;
+        double offset = r.getMinY() + 2*r.height / 3.0f;
 
         Set<Map.Entry<Integer, Integer>> entries = resources.entrySet();
         for(Map.Entry<Integer, Integer> entry : entries)
@@ -509,19 +597,55 @@ public abstract class VGDLSprite {
             int resType = entry.getKey();
             int resValue = entry.getValue();
 
-            double wiggle = rect.width/10.0f;
-            double prop = Math.max(0,Math.min(1,resValue / (double)(game.getResourceLimit(resType))));
+            if(resType > -1) {
+                double wiggle = r.width / 10.0f;
+                double prop = Math.max(0, Math.min(1, resValue / (double) (game.getResourceLimit(resType))));
 
-            Rectangle filled = new Rectangle((int) (rect.x+wiggle/2), (int) offset, (int) (prop*(rect.width-wiggle)), (int) barheight);
-            Rectangle rest   = new Rectangle((int) (rect.x+wiggle/2+prop*(rect.width-wiggle)), (int)offset, (int) ((1-prop)*(rect.width-wiggle)), (int)barheight);
+                Rectangle filled = new Rectangle((int) (r.x + wiggle / 2), (int) offset, (int) (prop * (r.width - wiggle)), (int) barheight);
+                Rectangle rest = new Rectangle((int) (r.x + wiggle / 2 + prop * (r.width - wiggle)), (int) offset, (int) ((1 - prop) * (r.width - wiggle)), (int) barheight);
 
-            gphx.setColor(game.getResourceColor(resType));
-            gphx.fillRect(filled.x, filled.y, filled.width, filled.height);
-            gphx.setColor(Types.BLACK);
-            gphx.fillRect(rest.x, rest.y, rest.width, rest.height);
-            offset += barheight;
+                gphx.setColor(game.getResourceColor(resType));
+                gphx.fillRect(filled.x, filled.y, filled.width, filled.height);
+                gphx.setColor(Types.BLACK);
+                gphx.fillRect(rest.x, rest.y, rest.width, rest.height);
+                offset += barheight;
+            }
         }
 
+    }
+
+
+    /**
+     * Draws the health bar, as a vertical bar on top (and left) of the sprite.
+     * @param gphx graphics to draw in.
+     * @param game game being played at the moment.
+     * @param r rectangle of this sprite.
+     */
+    protected void _drawHealthBar(Graphics2D gphx, Game game, Rectangle r)
+    {
+        int maxHP = maxHealthPoints;
+        if(limitHealthPoints != 1000)
+            maxHP = limitHealthPoints;
+
+        double wiggleX = r.width * 0.1f;
+        double wiggleY = r.height * 0.1f;
+        double prop = Math.max(0,Math.min(1, healthPoints / (double) maxHP));
+
+        double barHeight = r.height-wiggleY;
+        int heightHealth = (int) (prop*barHeight);
+        int heightUnhealth = (int) ((1-prop)*barHeight);
+        int startY = (int) (r.getMinY()+wiggleY*0.5f);
+
+        int barWidth = (int) (r.width * 0.1f);
+        int xOffset = (int) (r.x+wiggleX * 0.5f);
+
+        Rectangle filled = new Rectangle(xOffset, startY + heightUnhealth, barWidth, heightHealth);
+        Rectangle rest   = new Rectangle(xOffset, startY, barWidth, heightUnhealth);
+
+        gphx.setColor(Types.RED);
+        gphx.fillRect(filled.x, filled.y, filled.width, filled.height);
+        gphx.setColor(Types.BLACK);
+        gphx.fillRect(rest.x, rest.y, rest.width, rest.height);
     }
 
     /**
@@ -545,6 +669,9 @@ public abstract class VGDLSprite {
             //Any sprite that receives an orientation, is oriented.
             this.is_oriented = true;
         }
+
+        if(maxHealthPoints == 0)
+            maxHealthPoints = healthPoints;
     }
 
     /**
@@ -570,6 +697,9 @@ public abstract class VGDLSprite {
             } catch (IOException e) {
                 System.out.println("Image " + str + " could not be found.");
                 e.printStackTrace();
+            } catch (Exception e) {
+                //Ignore other exceptions.
+                //If no images are shown, it'll draw an coloured rectangle instead.
             }
         }
     }
@@ -634,6 +764,13 @@ public abstract class VGDLSprite {
         toSprite.is_from_avatar = this.is_from_avatar;
         toSprite.bucket = this.bucket;
         toSprite.bucketSharp = this.bucketSharp;
+        toSprite.invisible = this.invisible;
+        toSprite.rotateInPlace = this.rotateInPlace;
+        toSprite.isFirstTick = this.isFirstTick;
+        toSprite.hidden = this.hidden;
+        toSprite.healthPoints = this.healthPoints;
+        toSprite.maxHealthPoints = this.maxHealthPoints;
+        toSprite.limitHealthPoints = this.limitHealthPoints;
 
         toSprite.itypes = new ArrayList<Integer>();
         for(Integer it : this.itypes)
@@ -648,4 +785,58 @@ public abstract class VGDLSprite {
 
     }
 
+    /**
+     * Determines if two the object passed is equal to this.
+     * We are NOT overriding EQUALS on purpose (Costly operation for eventHandling).
+     */
+    public boolean equiv(Object o)
+    {
+        if(this == o) return true;
+        if(!(o instanceof VGDLSprite)) return false;
+        VGDLSprite other = (VGDLSprite)o;
+
+        if(other.name != this.name) return false;
+        if(other.is_static != this.is_static) return false;
+        if(other.only_active != this.only_active) return false;
+        if(other.is_avatar != this.is_avatar) return false;
+        if(other.is_stochastic != this.is_stochastic) return false;
+        if(other.cooldown != this.cooldown) return false;
+        if(other.speed != this.speed) return false;
+        if(other.mass != this.mass) return false;
+        if(other.physicstype_id != this.physicstype_id) return false;
+        if(other.shrinkfactor != this.shrinkfactor) return false;
+        if(other.is_oriented != this.is_oriented) return false;
+        if(!other.orientation.equals(this.orientation)) return false;
+        if(!other.rect.equals(this.rect)) return false;
+        if(other.lastmove != this.lastmove) return false;
+        if(other.strength != this.strength) return false;
+        if(other.singleton != this.singleton) return false;
+        if(other.is_resource != this.is_resource) return false;
+        if(other.portal != this.portal) return false;
+        if(other.is_npc != this.is_npc) return false;
+        if(other.is_from_avatar != this.is_from_avatar) return false;
+        if(other.invisible != this.invisible) return false;
+        if(other.spriteID != this.spriteID) return false;
+        if(other.isFirstTick != this.isFirstTick) return false;
+        if(other.hidden != this.hidden) return false;
+        if(other.healthPoints != this.healthPoints) return false;
+        if(other.maxHealthPoints != this.maxHealthPoints) return false;
+        if(other.limitHealthPoints != this.limitHealthPoints) return false;
+
+        int numTypes = other.itypes.size();
+        if(numTypes != this.itypes.size()) return false;
+        for(int i = 0; i < numTypes; ++i)
+            if(other.itypes.get(i) != this.itypes.get(i)) return false;
+
+        return true;
+    }
+
+    /**
+     * Get all sprites that affect or being affected by the current sprite
+     * @return a list of all dependent sprites
+     */
+    public ArrayList<String> getDependentSprites(){
+    	return new ArrayList<String>();
+    }
+    
 }

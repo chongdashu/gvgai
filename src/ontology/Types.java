@@ -1,12 +1,9 @@
 package ontology;
 
-import tools.Vector2d;
-
 import java.awt.Color;
-
-import java.util.ArrayList;
 import java.awt.event.KeyEvent;
-import java.util.Vector;
+
+import tools.Vector2d;
 
 /**
  * Created with IntelliJ IDEA.
@@ -50,6 +47,7 @@ public class Types {
         ACTION_ESCAPE(new int[]{KeyEvent.VK_ESCAPE});
 
         private int[] key;
+
         ACTIONS(int[] numVal) {
             this.key = numVal;
         }
@@ -58,25 +56,24 @@ public class Types {
             return this.key;
         }
 
-        public static ACTIONS fromString(String strKey)
-        {
-            if(strKey.equalsIgnoreCase("ACTION_UP")) return ACTION_UP;
-            else if(strKey.equalsIgnoreCase("ACTION_LEFT")) return ACTION_LEFT;
-            else if(strKey.equalsIgnoreCase("ACTION_DOWN")) return ACTION_DOWN;
-            else if(strKey.equalsIgnoreCase("ACTION_RIGHT")) return ACTION_RIGHT;
-            else if(strKey.equalsIgnoreCase("ACTION_USE")) return ACTION_USE;
-            else if(strKey.equalsIgnoreCase("ACTION_ESCAPE")) return ACTION_ESCAPE;
+        public static ACTIONS fromString(String strKey) {
+            if (strKey.equalsIgnoreCase("ACTION_UP")) return ACTION_UP;
+            else if (strKey.equalsIgnoreCase("ACTION_LEFT")) return ACTION_LEFT;
+            else if (strKey.equalsIgnoreCase("ACTION_DOWN")) return ACTION_DOWN;
+            else if (strKey.equalsIgnoreCase("ACTION_RIGHT")) return ACTION_RIGHT;
+            else if (strKey.equalsIgnoreCase("ACTION_USE")) return ACTION_USE;
+            else if (strKey.equalsIgnoreCase("ACTION_ESCAPE")) return ACTION_ESCAPE;
             else return ACTION_NIL;
         }
 
-        public static ACTIONS fromVector(Vector2d move)
-        {
-            if(move == UP) return ACTION_UP;
-            else if(move == DOWN) return ACTION_DOWN;
-            else if(move == LEFT) return ACTION_LEFT;
-            else if(move == RIGHT) return ACTION_RIGHT;
+        public static ACTIONS fromVector(Vector2d move) {
+            if (move == UP) return ACTION_UP;
+            else if (move == DOWN) return ACTION_DOWN;
+            else if (move == LEFT) return ACTION_LEFT;
+            else if (move == RIGHT) return ACTION_RIGHT;
             else return ACTION_NIL;
         }
+
     }
 
 
@@ -90,6 +87,13 @@ public class Types {
         WINNER(int val) {key=val;}
         public int key() {return key;}
     }
+
+    public static enum MOVEMENT {
+        STILL,
+        ROTATE,
+        MOVE
+    }
+
 
     public static final int SCORE_DISQ = -1000;
 

@@ -1,13 +1,13 @@
 package controllers.sampleMCTS;
 
+import java.util.ArrayList;
+import java.util.Random;
+
 import core.game.Observation;
 import core.game.StateObservation;
 import core.player.AbstractPlayer;
 import ontology.Types;
 import tools.ElapsedCpuTimer;
-
-import java.util.ArrayList;
-import java.util.Random;
 
 /**
  * Created with IntelliJ IDEA.
@@ -70,5 +70,18 @@ public class Agent extends AbstractPlayer {
         //... and return it.
         return actions[action];
     }
+
+    /**
+     * Function called when the game is over. This method must finish before CompetitionParameters.TEAR_DOWN_TIME,
+     *  or the agent will be DISQUALIFIED
+     * @param stateObservation the game state at the end of the game
+     * @param elapsedCpuTimer timer when this method is meant to finish.
+     */
+    public void result(StateObservation stateObservation, ElapsedCpuTimer elapsedCpuTimer)
+    {
+        //Include your code here to know how it all ended.
+        //System.out.println("Game over? " + stateObservation.isGameOver());
+    }
+
 
 }

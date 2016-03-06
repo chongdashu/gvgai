@@ -1,8 +1,11 @@
 package core.termination;
 
+import java.util.ArrayList;
+
 import core.VGDLRegistry;
 import core.content.TerminationContent;
 import core.game.Game;
+import core.game.GameDescription.TerminationData;
 
 /**
  * Created with IntelliJ IDEA.
@@ -13,9 +16,10 @@ import core.game.Game;
  */
 public class MultiSpriteCounter extends Termination
 {
-    //TODO: Theoretically, we could have an array of types here... to be done.
+    //TODO if needed: Theoretically, we could have an array of types here... to be done.
     public String stype1, stype2;
     public int itype1=-1, itype2=-1;
+    public boolean min = false;
 
     public MultiSpriteCounter(){}
 
@@ -42,6 +46,18 @@ public class MultiSpriteCounter extends Termination
         if(countAcum == limit)
             return true;
 
+        if(min && countAcum > limit)
+            return true; //If the limit is a lower bound in what's required.
+
         return false;
     }
+    
+    @Override
+	public ArrayList<String> getTerminationSprites() {
+		ArrayList<String> result = new ArrayList<String>();
+		if(stype1 != null) result.add(stype1);
+		if(stype2 != null) result.add(stype2);
+		
+		return result;
+	}
 }

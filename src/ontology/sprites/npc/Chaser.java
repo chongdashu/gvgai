@@ -1,5 +1,10 @@
 package ontology.sprites.npc;
 
+import java.awt.Dimension;
+import java.awt.Rectangle;
+import java.util.ArrayList;
+import java.util.Iterator;
+
 import core.VGDLRegistry;
 import core.VGDLSprite;
 import core.content.SpriteContent;
@@ -7,10 +12,6 @@ import core.game.Game;
 import ontology.Types;
 import tools.Utils;
 import tools.Vector2d;
-
-import java.awt.*;
-import java.util.ArrayList;
-import java.util.Iterator;
 
 /**
  * Created with IntelliJ IDEA.
@@ -24,6 +25,7 @@ public class Chaser extends RandomNPC
     public boolean fleeing;
     public String stype;
     public int itype;
+    public float maxDistance;
 
     ArrayList<VGDLSprite> targets;
     ArrayList<Vector2d> actions;
@@ -46,6 +48,7 @@ public class Chaser extends RandomNPC
     {
         super.loadDefaults();
         fleeing = false;
+        maxDistance = -1;
         targets = new ArrayList<VGDLSprite>();
         actions = new ArrayList<Vector2d>();
     }
@@ -89,6 +92,14 @@ public class Chaser extends RandomNPC
     protected void movesToward(VGDLSprite target)
     {
         double distance = this.physics.distance(rect, target.rect);
+
+        if(maxDistance != -1 && distance > maxDistance)
+        {
+            //We have a maximum distance set up, and the target is further than that.
+            // -> We don't react to this target.
+            return;
+        }
+
         for(Vector2d act : Types.BASEDIRS)
         {
             //Calculate the distance if I'd apply this move.
@@ -114,6 +125,8 @@ public class Chaser extends RandomNPC
         double bestDist = Double.MAX_VALUE;
 
         Iterator<VGDLSprite> spriteIt = game.getSpriteGroup(itype);
+        if(spriteIt == null) spriteIt = game.getSubSpritesGroup(itype); //Try subtypes
+
         if(spriteIt != null) while(spriteIt.hasNext())
         {
             VGDLSprite s = spriteIt.next();
@@ -143,9 +156,18 @@ public class Chaser extends RandomNPC
         targetSprite.fleeing = this.fleeing;
         targetSprite.stype = this.stype;
         targetSprite.itype = this.itype;
+        targetSprite.maxDistance = this.maxDistance;
         targetSprite.targets = new ArrayList<VGDLSprite>();
         targetSprite.actions = new ArrayList<Vector2d>();
         super.copyTo(targetSprite);
+    }
+    
+    @Override
+    public ArrayList<String> getDependentSprites(){
+    	ArrayList<String> result = new ArrayList<String>();
+    	if(stype != null) result.add(stype);
+    	
+    	return result;
     }
 
 }

@@ -1,9 +1,10 @@
 package ontology.physics;
 
-import core.VGDLSprite;
-import tools.Vector2d;
+import java.awt.Rectangle;
 
-import java.awt.*;
+import core.VGDLSprite;
+import ontology.Types;
+import tools.Vector2d;
 
 /**
  * Created with IntelliJ IDEA.
@@ -14,7 +15,7 @@ import java.awt.*;
  */
 public interface Physics
 {
-    public void passiveMovement(VGDLSprite sprite);
-    public void activeMovement(VGDLSprite sprite, Vector2d action, double speed);
+    public Types.MOVEMENT passiveMovement(VGDLSprite sprite);
+    public Types.MOVEMENT activeMovement(VGDLSprite sprite, Vector2d action, double speed);
     public double distance(Rectangle r1, Rectangle r2);
 }

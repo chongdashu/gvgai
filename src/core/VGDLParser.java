@@ -1,14 +1,28 @@
 package core;
 
-import core.content.*;
+import java.awt.Dimension;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+import core.content.GameContent;
+import core.content.InteractionContent;
+import core.content.MappingContent;
+import core.content.SpriteContent;
+import core.content.TerminationContent;
 import core.game.Game;
+import core.game.GameDescription;
+import core.game.GameDescription.InteractionData;
+import core.game.GameDescription.SpriteData;
+import core.game.GameDescription.TerminationData;
 import core.termination.Termination;
 import ontology.Types;
 import ontology.effects.Effect;
+import ontology.effects.TimeEffect;
 import tools.IO;
 import tools.Pair;
-
-import java.util.*;
+import tools.Vector2d;
 
 /**
  * Created with IntelliJ IDEA.
@@ -97,7 +111,7 @@ public class VGDLParser
 
         return game;
     }
-
+    
     /**
      * Builds the tree structure that defines the game.
      * @param lines array with the lines read from the game description file.
@@ -280,40 +294,60 @@ public class VGDLParser
             {
                 Effect ef = VGDLFactory.GetInstance().createEffect(ic);
 
-                //Get the identifiers of both sprites taking part in the effect
+                //Get the identifiers of the first sprite taking part in the effect.
                 int obj1 = VGDLRegistry.GetInstance().getRegisteredSpriteValue(ic.object1);
-                int obj2 = VGDLRegistry.GetInstance().getRegisteredSpriteValue(ic.object2);
-                if(obj1 != -1 && obj2 != -1)
-                {
-                    Pair newPair = new Pair(obj1,obj2);
-                    if(!game.getDefinedEffects().contains(newPair))
-                        game.getDefinedEffects().add(newPair);
 
-                    //game.collisionEffects[obj1][obj2].add(ef);
-                    game.getCollisionEffects(obj1, obj2).add(ef);
-
-                    if(VERBOSE_PARSER)
-                        System.out.println("Defining interaction " + ic.object1 + "+" + ic.object2 +
-                                       " > " + ic.function);
-                }else if(obj1 != -1 && obj2 == -1)
+                //The second identifier comes from a list of sprites. We go one by one.
+                for(String obj2Str : ic.object2)
                 {
-                    //Only one sprite is defined in SpriteSet, this might be an EOS effect.
-                    if(ic.object2.equalsIgnoreCase("EOS"))
+                    int obj2 = VGDLRegistry.GetInstance().getRegisteredSpriteValue(obj2Str);
+
+                    if(obj1 != -1 && obj2 != -1)
                     {
-                        game.getDefinedEosEffects().add(obj1);
-                        game.getEosEffects(obj1).add(ef);
+                        Pair newPair = new Pair(obj1,obj2);
+                        if(!game.getDefinedEffects().contains(newPair))
+                            game.getDefinedEffects().add(newPair);
+
+                        ArrayList<Effect> collEffects = game.getCollisionEffects(obj1, obj2);
+
+                        //Add the effects as many times as indicated in its 'repeat' field (1 by defualt).
+                        for(int r = 0; r < ef.repeat; ++r)
+                            collEffects.add(ef);
+
+                        if(VERBOSE_PARSER)
+                            System.out.println("Defining interaction " + ic.object1 + "+" + obj2Str +
+                                    " > " + ic.function);
+
+                    }else if(obj1 == -1 || obj2 == -1) {
+
+                        //EOS or a TIME Effect (since VGDL 2.0)
+                        if (obj2Str.equalsIgnoreCase("EOS")) {
+                            game.getDefinedEosEffects().add(obj1);
+                            game.getEosEffects(obj1).add(ef);
+
+                        }else if (ic.object1.equalsIgnoreCase("EOS")) {
+                            game.getDefinedEosEffects().add(obj2);
+                            game.getEosEffects(obj2).add(ef);
+
+                        }else if (ic.object1.equalsIgnoreCase("TIME") ||
+                                   obj2Str.equalsIgnoreCase("TIME")) {
+                            game.addTimeEffect((TimeEffect) ef);
+                        }
                     }
 
                     if(VERBOSE_PARSER)
-                        System.out.println("Defining interaction " + ic.object1 + "+" + ic.object2 +
-                            " > " + ic.function);
+                        System.out.println("Defining interaction " + ic.object1 + "+" + obj2Str +
+                                " > " + ic.function);
+
+                    //update game stochasticity.
+                    if(ef.is_stochastic)
+                    {
+                        game.setStochastic(true);
+                    }
+
                 }
 
-                //update game stochasticity.
-                if(ef.is_stochastic)
-                {
-                    game.setStochastic(true);
-                }
+
             }else{
                 System.out.println("[PARSE ERROR] bad format interaction entry: " + ic.line);
             }
@@ -348,7 +382,4 @@ public class VGDLParser
         }
 
     }
-
-
-
 }

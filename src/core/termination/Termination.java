@@ -1,11 +1,12 @@
 package core.termination;
 
+import java.util.ArrayList;
+
 import core.VGDLFactory;
 import core.content.TerminationContent;
 import core.game.Game;
+import core.game.GameDescription;
 import ontology.Types;
-
-import java.awt.event.KeyEvent;
 /**
  * Created with IntelliJ IDEA.
  * User: Diego
@@ -28,7 +29,14 @@ public abstract class Termination {
     public boolean isFinished(Game game)
     {
         //It's finished if the player pressed ESCAPE or the game is over..
-        return game.ki.getMask()[Types.ACTIONS.ACTION_ESCAPE.getKey()[0]] || game.isGameOver();
+        return game.isGameOver();
     }
 
+    /**
+     * Get all sprites that are used to check the termination condition
+     * @return all termination condition sprites
+     */
+    public ArrayList<String> getTerminationSprites(){
+    	return new ArrayList<String>();
+    }
 }

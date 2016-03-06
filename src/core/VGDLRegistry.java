@@ -80,6 +80,25 @@ public class VGDLRegistry
         return -1;
     }
 
+
+    /**
+     * Returns an array of indexes (value in map) of a set of keys, for sprites.
+     * @param keys list of keys, separated by commas.
+     * @return array with values in the map, -1 if it does not exist.
+     */
+    public int[] explode(String keys)
+    {
+        if(keys == null)
+            return new int[]{-1};
+
+        String[] keysArray = keys.split(",");
+        int[] intKeys = new int[keysArray.length];
+        for(int i = 0; i < keysArray.length; ++i)
+            intKeys[i] = getRegisteredSpriteValue(keysArray[i]);
+
+        return intKeys;
+    }
+
     /**
      * Returns the String associated with the first (and in theory, unique) sprite value passed.
      * This method is for <b>debug purposes only</b>, should not be used for game execution.
@@ -89,7 +108,7 @@ public class VGDLRegistry
     public String getRegisteredSpriteKey(int value)
     {
         //This method should not be used.
-        System.out.println("This method is deprecated, should not be used (other than debug).");
+        //System.out.println("This method is deprecated, should not be used (other than debug).");
         if(sprite_mapping.containsValue(value))
         {
             Set<Map.Entry<String, Integer>> entries = sprite_mapping.entrySet();

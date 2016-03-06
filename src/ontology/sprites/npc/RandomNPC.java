@@ -1,13 +1,13 @@
 package ontology.sprites.npc;
 
+import java.awt.Dimension;
+
 import core.VGDLSprite;
 import core.content.SpriteContent;
 import core.game.Game;
 import ontology.Types;
 import tools.Utils;
 import tools.Vector2d;
-
-import java.awt.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -18,6 +18,12 @@ import java.awt.*;
  */
 public class RandomNPC extends VGDLSprite
 {
+    //Number of consecutive moves the sprite performs.
+    public int cons;
+
+    protected int counter;
+    protected Vector2d prevAction;
+
     public RandomNPC(){}
 
     public RandomNPC(Vector2d position, Dimension size, SpriteContent cnt)
@@ -36,16 +42,37 @@ public class RandomNPC extends VGDLSprite
     {
         super.loadDefaults();
         speed = 1;
+        cons = 0;
         is_npc = true;
         is_stochastic = true;
+        counter = cons;
+        prevAction = Types.NONE;
+    }
+
+    protected Vector2d getRandomMove(Game game)
+    {
+        if(counter < cons)
+        {
+            //Apply previous action (repeat cons times).
+            counter++;
+            return prevAction.copy();
+        }else{
+            //Determine a new action
+            Vector2d act = (Vector2d) Utils.choice(Types.BASEDIRS, game.getRandomGenerator());
+            prevAction = act.copy();
+            counter=0;
+            return act;
+        }
     }
 
     public void update(Game game)
     {
         super.updatePassive();
-        Vector2d act = (Vector2d) Utils.choice(Types.BASEDIRS, game.getRandomGenerator());
+        Vector2d act = getRandomMove(game);
         this.physics.activeMovement(this, act, this.speed);
     }
+
+
 
     public VGDLSprite copy()
     {
@@ -57,6 +84,9 @@ public class RandomNPC extends VGDLSprite
     public void copyTo(VGDLSprite target)
     {
         RandomNPC targetSprite = (RandomNPC) target;
+        targetSprite.cons = this.cons;
+        targetSprite.prevAction = this.prevAction;
+        targetSprite.counter = this.counter;
         super.copyTo(targetSprite);
     }
 }

@@ -1,24 +1,54 @@
 package core;
 
-import core.content.*;
-import core.game.*;
-import core.termination.*;
-import ontology.Types;
-import ontology.avatar.*;
-import ontology.avatar.oriented.*;
-import ontology.effects.*;
-import ontology.effects.binary.*;
-import ontology.effects.unary.*;
-import ontology.sprites.*;
-import ontology.sprites.missile.*;
-import ontology.sprites.npc.*;
-import ontology.sprites.producer.*;
-import tools.Vector2d;
-
-import java.awt.*;
+import java.awt.Dimension;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.HashMap;
+
+import core.content.Content;
+import core.content.GameContent;
+import core.content.InteractionContent;
+import core.content.SpriteContent;
+import core.content.TerminationContent;
+import core.game.BasicGame;
+import core.game.Game;
+import core.termination.MultiSpriteCounter;
+import core.termination.SpriteCounter;
+import core.termination.Termination;
+import core.termination.Timeout;
+import ontology.Types;
+import ontology.avatar.FlakAvatar;
+import ontology.avatar.HorizontalAvatar;
+import ontology.avatar.MovingAvatar;
+import ontology.avatar.oriented.MissileAvatar;
+import ontology.avatar.oriented.OngoingAvatar;
+import ontology.avatar.oriented.OrientedAvatar;
+import ontology.avatar.oriented.ShootAvatar;
+import ontology.effects.Effect;
+import ontology.effects.TimeEffect;
+import ontology.effects.binary.*;
+import ontology.effects.unary.*;
+import ontology.sprites.Conveyor;
+import ontology.sprites.Door;
+import ontology.sprites.Flicker;
+import ontology.sprites.Immovable;
+import ontology.sprites.OrientedFlicker;
+import ontology.sprites.Passive;
+import ontology.sprites.Resource;
+import ontology.sprites.ResourcePack;
+import ontology.sprites.Spreader;
+import ontology.sprites.missile.ErraticMissile;
+import ontology.sprites.missile.Missile;
+import ontology.sprites.missile.RandomMissile;
+import ontology.sprites.missile.Walker;
+import ontology.sprites.missile.WalkerJumper;
+import ontology.sprites.npc.*;
+import ontology.sprites.producer.Bomber;
+import ontology.sprites.producer.Portal;
+import ontology.sprites.producer.RandomBomber;
+import ontology.sprites.producer.SpawnPoint;
+import ontology.sprites.producer.SpriteProducer;
+import tools.Vector2d;
 
 /**
  * Created with IntelliJ IDEA.
@@ -36,12 +66,11 @@ public class VGDLFactory
     private String[] spriteStrings = new String[]
             {"Conveyor", "Flicker", "Immovable", "OrientedFlicker", "Passive", "Resource", "Spreader",
              "ErraticMissile", "Missile", "RandomMissile", "Walker", "WalkerJumper",
-             "ResourcePack", "Chaser", "Fleeing", "RandomInertial", "RandomNPC", "AlternateChaser", "RandomAltChaser",
-             "Bomber", "Portal", "SpawnPoint", "SpriteProducer", "Door",
-             "FlakAvatar", "HorizontalAvatar","MovingAvatar", "VerticalAvatar",
-             "NoisyRotatingFlippingAvatar","RotatingAvatar","RotatingFlippingAvatar",
-             "AimedAvatar","AimedFlakAvatar","InertialAvatar","MarioAvatar",
-             "OrientedAvatar","ShootAvatar", "MissileAvatar"};
+             "ResourcePack", "Chaser", "PathChaser", "Fleeing", "RandomInertial",
+             "RandomNPC", "AlternateChaser", "RandomAltChaser","PathAltChaser", "RandomPathAltChaser",
+             "Bomber", "RandomBomber", "Portal", "SpawnPoint", "SpriteProducer", "Door",
+             "FlakAvatar", "HorizontalAvatar","MovingAvatar","MissileAvatar",
+             "OrientedAvatar","ShootAvatar", "OngoingAvatar"};
 
 
     /**
@@ -50,23 +79,23 @@ public class VGDLFactory
     private Class[] spriteClasses = new Class[]
             {Conveyor.class, Flicker.class, Immovable.class, OrientedFlicker.class, Passive.class, Resource.class, Spreader.class,
              ErraticMissile.class, Missile.class, RandomMissile.class, Walker.class, WalkerJumper.class,
-             ResourcePack.class, Chaser.class, Fleeing.class, RandomInertial.class, RandomNPC.class, AlternateChaser.class, RandomAltChaser.class,
-             Bomber.class, Portal.class, SpawnPoint.class, SpriteProducer.class, Door.class,
-             FlakAvatar.class, HorizontalAvatar.class,MovingAvatar.class, VerticalAvatar.class,
-             NoisyRotatingFlippingAvatar.class,RotatingAvatar.class,RotatingFlippingAvatar.class,
-             AimedAvatar.class,AimedFlakAvatar.class,InertialAvatar.class,MarioAvatar.class,
-             OrientedAvatar.class,ShootAvatar.class, MissileAvatar.class};
+             ResourcePack.class, Chaser.class, PathChaser.class, Fleeing.class, RandomInertial.class,
+             RandomNPC.class, AlternateChaser.class, RandomAltChaser.class, PathAltChaser.class, RandomPathAltChaser.class,
+             Bomber.class, RandomBomber.class, Portal.class, SpawnPoint.class, SpriteProducer.class, Door.class,
+             FlakAvatar.class, HorizontalAvatar.class,MovingAvatar.class,MissileAvatar.class,
+             OrientedAvatar.class,ShootAvatar.class, OngoingAvatar.class};
 
     /**
      * Available effects for VGDL.
      */
     private String[] effectStrings = new String[]
             {
-                "stepBack", "turnAround", "killSprite", "transformTo", "wrapAround", "changeResource",
-                "killIfHasLess", "killIfHasMore", "cloneSprite", "flipDirection", "reverseDirection",
-                "undoAll", "spawnIfHasMore",
-                "pullWithIt", "wallStop", "collectResource", "killIfOtherHasMore", "killIfFromAbove",
-                "teleportToExit", "bounceForward", "attractGaze"
+                "stepBack", "turnAround", "killSprite", "killBoth", "transformTo", "transformToSingleton",
+                    "wrapAround", "changeResource", "killIfHasLess", "killIfHasMore", "cloneSprite",
+                    "flipDirection", "reverseDirection", "shieldFrom", "undoAll", "spawn", "spawnIfHasMore", "spawnIfHasLess",
+                "pullWithIt", "wallStop", "collectResource", "collectResourceIfHeld", "killIfOtherHasMore", "killIfFromAbove",
+                "teleportToExit", "bounceForward", "attractGaze", "subtractHealthPoints", "addHealthPoints",
+                    "transformToAll", "addTimer", "killIfFrontal", "killIfNotFrontal"
             };
 
     /**
@@ -74,11 +103,12 @@ public class VGDLFactory
      */
     private Class[] effectClasses = new Class[]
             {
-                StepBack.class, TurnAround.class, KillSprite.class, TransformTo.class, WrapAround.class,ChangeResource.class,
-                KillIfHasLess.class, KillIfHasMore.class, CloneSprite.class, FlipDirection.class, ReverseDirection.class,
-                UndoAll.class, SpawnIfHasMore.class,
-                PullWithIt.class, WallStop.class, CollectResource.class, KillIfOtherHasMore.class, KillIfFromAbove.class,
-                TeleportToExit.class, BounceForward.class, AttractGaze.class
+                StepBack.class, TurnAround.class, KillSprite.class, KillBoth.class, TransformTo.class, TransformToSingleton.class,
+                    WrapAround.class,ChangeResource.class, KillIfHasLess.class, KillIfHasMore.class, CloneSprite.class,
+                    FlipDirection.class, ReverseDirection.class, ShieldFrom.class, UndoAll.class, Spawn.class, SpawnIfHasMore.class, SpawnIfHasLess.class,
+                PullWithIt.class, WallStop.class, CollectResource.class, CollectResourceIfHeld.class, KillIfOtherHasMore.class, KillIfFromAbove.class,
+                TeleportToExit.class, BounceForward.class, AttractGaze.class, SubtractHealthPoints.class, AddHealthPoints.class,
+                    TransformToAll.class, AddTimer.class, KillIfFrontal.class, KillIfNotFrontal.class
             };
 
 
@@ -234,6 +264,11 @@ public class VGDLFactory
             Constructor effectConstructor = effectClass.getConstructor
                     (new Class[] {InteractionContent.class});
             Effect ef = (Effect) effectConstructor.newInstance(new Object[]{content});
+
+            if( content.object1.equalsIgnoreCase("TIME") ||
+                content.object2[0].equalsIgnoreCase("TIME"))
+                return new TimeEffect(content, ef);
+
             return ef;
 
         }catch (NoSuchMethodException e)
@@ -340,7 +375,19 @@ public class VGDLFactory
             }
             else
             {
-                System.out.println("Unknown field (" + parameter + "=" + value +
+                //Ignore unknown fields in dependent Effects (TimeEffect).
+                boolean warn = true;
+                boolean isInteraction = (content instanceof InteractionContent);
+                if(isInteraction)
+                {
+                    boolean isTimeEffect = ((InteractionContent)content).object2[0].equalsIgnoreCase("TIME") ||
+                                            ((InteractionContent)content).object1.equalsIgnoreCase("TIME") ||
+                                            (((InteractionContent) content).line.contains("addTimer")) ;
+                    if(isTimeEffect) warn = false;
+                }
+
+                if( warn )
+                    System.out.println("Unknown field (" + parameter + "=" + value +
                         ") from " + content.toString());
             }
         }

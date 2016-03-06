@@ -1,15 +1,14 @@
 package core.player;
 
-import core.game.StateObservation;
-import ontology.Types;
-import tools.ElapsedCpuTimer;
-
-import java.awt.*;
+import java.awt.Graphics2D;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
+
+import core.game.StateObservation;
+import ontology.Types;
+import tools.ElapsedCpuTimer;
 
 /**
  * Created with IntelliJ IDEA.
@@ -51,6 +50,17 @@ public abstract class AbstractPlayer {
      * @return An action for the current state
      */
     public abstract Types.ACTIONS act(StateObservation stateObs, ElapsedCpuTimer elapsedTimer);
+
+    /**
+     * Function called when the game is over. This method must finish before CompetitionParameters.TEAR_DOWN_TIME,
+     *  or the agent will be DISQUALIFIED
+     * @param stateObservation the game state at the end of the game
+     * @param elapsedCpuTimer timer when this method is meant to finish.
+     */
+    public void result(StateObservation stateObservation, ElapsedCpuTimer elapsedCpuTimer)
+    {
+
+    }
 
 
     /**

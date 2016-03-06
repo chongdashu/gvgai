@@ -1,12 +1,11 @@
 package ontology.avatar.oriented;
 
+import java.awt.Dimension;
+
 import core.VGDLSprite;
 import core.content.SpriteContent;
 import core.game.Game;
-import ontology.Types;
 import tools.Vector2d;
-
-import java.awt.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -38,10 +37,28 @@ public class MissileAvatar extends OrientedAvatar
         is_oriented = true;
     }
 
+    /**
+     * This update call is for the game tick() loop.
+     * @param game current state of the game.
+     */
     public void update(Game game)
     {
+        //Get the input from the player (it won't be processed, but we allow thinking time).
+        requestPlayerInput(game);
+
         //MissileAvatar has no actions available. Just update movement.
-        updatePassive();
+        super.updatePassive();
+    }
+
+
+    /**
+     * This move call is for the Forward Model tick() loop.
+     * @param game current state of the game.
+     * @param actionMask action to apply.
+     */
+    public void move(Game game, boolean[] actionMask)
+    {
+        super.updatePassive();
     }
 
 

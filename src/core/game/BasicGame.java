@@ -1,14 +1,16 @@
 package core.game;
 
+import java.awt.Dimension;
+import java.util.ArrayList;
+
 import core.VGDLFactory;
 import core.VGDLRegistry;
 import core.VGDLSprite;
+import core.competition.CompetitionParameters;
 import core.content.GameContent;
 import tools.IO;
 import tools.Vector2d;
-
-import java.awt.*;
-import java.util.ArrayList;
+import tools.pathfinder.PathFinder;
 
 /**
  * Created with IntelliJ IDEA.
@@ -27,6 +29,16 @@ public class BasicGame extends Game {
     public int square_size;
 
     /**
+     * List of sprites that should not be traversable for the pathfinder. This list can be specified
+     * with sprite string identifiers separated by commas.
+     */
+    public String obs;
+
+    //List of IDs of the sprites should not be traversable for the pathfinder.
+    private ArrayList<Integer> obstacles;
+
+
+    /**
      * Default constructor for a basic game.
      * @param content Contains parameters for the game.
      */
@@ -35,10 +47,10 @@ public class BasicGame extends Game {
         super();
 
         //Add here whatever mappings are common for all BasicGames.
-        charMapping.put('w',new ArrayList<String>());
+        charMapping.put('w', new ArrayList<String>());
         charMapping.get('w').add("wall");
 
-        charMapping.put('A',new ArrayList<String>());
+        charMapping.put('A', new ArrayList<String>());
         charMapping.get('A').add("avatar");
 
         //Default values for frame rate and maximum number of sprites allowed.
@@ -50,15 +62,39 @@ public class BasicGame extends Game {
         this.parseParameters(content);
     }
 
+    /**
+     * Builds a level, receiving a file name.
+     * @param gamelvl file name containing the level.
+     */
+    public void buildLevel(String gamelvl){
+        String[] lines = new IO().readFile(gamelvl);
+
+        //Pathfinder
+        obstacles = new ArrayList<>();
+        obstacles.add(0); //Walls always in.
+        if(obs != null)
+        {
+            int obsArray[] = VGDLRegistry.GetInstance().explode(obs);
+            for(Integer it : obsArray)
+                obstacles.add(it);
+        }
+
+        pathf = new PathFinder(obstacles);
+
+        buildStringLevel(lines);
+
+        pathf.run(this.getObservation());
+    }
+
     @Override
     /**
      * Builds a level from this game, reading it from file.
      * @param gamelvl filename of the level to load.
      */
-    public void buildLevel(String gamelvl)
+    public void buildStringLevel(String[] lines)
     {
         //Read the level description
-        String[] desc_lines = new IO().readFile(gamelvl);
+        String[] desc_lines = lines;
 
         //Dimensions of the level read from the file.
         size.width = desc_lines[0].length();
@@ -112,6 +148,8 @@ public class BasicGame extends Game {
      */
     protected void parseParameters(GameContent content)
     {
+        super.parseParameters(content);
+
         VGDLFactory factory = VGDLFactory.GetInstance();
         Class refClass = VGDLFactory.registeredGames.get(content.referenceClass);
         //System.out.println("refClass" + refClass.toString());

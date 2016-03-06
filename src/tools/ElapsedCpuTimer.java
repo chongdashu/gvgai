@@ -29,6 +29,15 @@ public class ElapsedCpuTimer {
         oldTime = getTime();
     }
 
+    public ElapsedCpuTimer copy()
+    {
+        ElapsedCpuTimer newCpuTimer = new ElapsedCpuTimer(this.type);
+        newCpuTimer.maxTime = this.maxTime;
+        newCpuTimer.oldTime = this.oldTime;
+        newCpuTimer.bean = this.bean;
+        return newCpuTimer;
+    }
+
     public long elapsed() {
         return getTime() - oldTime;
     }
@@ -55,14 +64,12 @@ public class ElapsedCpuTimer {
         return elapsedMinutes()/60.0;
     }
 
-    public void reset() {
-        oldTime = getTime();
-    }
 
-    public String toString() {
+    @Override
+	public String toString() {
         // now resets the timer...
         String ret = elapsed() / 1000000.0 + " ms elapsed";
-        reset();
+        //reset();
         return ret;
     }
 
